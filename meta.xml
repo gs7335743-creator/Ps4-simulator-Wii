@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<app version="1">
+  <name>PS4 Simulator Wii</name>
+  <coder>Homebrew</coder>
+  <version>0.1</version>
+  <release_date>20261116000000</release_date>
+  <short_description>Menu inspirado no PS4 para Wii</short_description>
+  <long_description>Port inicial nativo em C++ para Nintendo Wii.</long_description>
+</app>
