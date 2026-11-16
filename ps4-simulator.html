@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Simulador de PS4</title>
+<style>
+:root{
+  --ink:#fff;
+  --tile:rgba(6,22,118,.55);
+  --tile-brand:#1760d6;
+  --line:rgba(190,210,255,.6);
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#000;overflow:hidden;color:var(--ink);
+  font-family:"SST","Segoe UI","Helvetica Neue",Arial,sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+#stage{position:absolute;left:0;top:0;width:1280px;height:720px;transform-origin:0 0;overflow:hidden;background:#0b2aa0}
+#bg{position:absolute;inset:0;width:1280px;height:720px}
+
+/* barra do topo */
+#top{position:absolute;left:0;top:0;width:1280px;height:122px}
+#top .it{position:absolute;top:61px;transform:translateY(-50%);display:flex;align-items:center;gap:8px;font-size:17px;font-weight:400;letter-spacing:.1px;white-space:nowrap}
+#top svg{display:block}
+#clock{right:50px;font-size:20px;font-weight:300}
+.avatar{width:34px;height:34px;border-radius:3px;background:linear-gradient(135deg,#f0b36b,#c2573a);display:grid;place-items:center;font-size:13px;font-weight:600;color:#fff;overflow:hidden}
+.dot{width:8px;height:8px;border-radius:50%;background:#4aa8ff;box-shadow:0 0 6px #4aa8ff}
+
+/* fileira de icones */
+#row{position:absolute;left:0;top:0;width:1280px;height:720px}
+.tile{position:absolute;top:134px;display:flex;flex-direction:column;overflow:hidden;cursor:pointer;
+  background:var(--tile);border:0;padding:0;color:inherit;font:inherit;
+  transition:left .32s var(--ease),width .32s var(--ease),height .32s var(--ease),background .2s,box-shadow .2s}
+.tile.brand{background:var(--tile-brand)}
+.tile .ico{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
+.tile .ico svg{width:60%;height:60%;transition:width .32s var(--ease),height .32s var(--ease)}
+.tile .ico .tl{position:absolute;left:0;right:0;bottom:9px;text-align:center;font-size:16px;font-weight:400;transition:opacity .15s}
+.tile .bar{height:0;overflow:hidden;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;transition:height .32s var(--ease)}
+.tile .bar svg{flex:none}
+.tile .bar svg{width:15px;height:15px}
+.tile.focus{background:linear-gradient(180deg,rgba(255,255,255,.3),rgba(255,255,255,.12));
+  box-shadow:0 0 0 2px #fff,0 0 0 5px rgba(255,255,255,.22),0 10px 40px rgba(0,10,80,.45);z-index:3}
+.tile.focus.brand{background:linear-gradient(180deg,#3c86f0,#1a63d6)}
+.tile.focus .ico svg{width:70%;height:70%}
+.tile.focus .ico .tl{opacity:0}
+.tile.focus.has .bar{height:50px}
+.tile.press{animation:press .28s var(--ease)}
+@keyframes press{50%{transform:scale(.94)}}
+
+#label{position:absolute;top:0;font-size:35px;font-weight:300;letter-spacing:.2px;white-space:nowrap;
+  transition:left .32s var(--ease),opacity .12s;opacity:1}
+#label.swap{opacity:0}
+#sub{position:absolute;top:0;font-size:17px;font-weight:300;opacity:.75;white-space:nowrap;transition:left .32s var(--ease)}
+
+#toast{position:absolute;left:50%;bottom:150px;transform:translate(-50%,16px);padding:12px 26px;border-radius:4px;
+  background:rgba(4,12,70,.85);border:1px solid rgba(255,255,255,.35);font-size:20px;font-weight:300;opacity:0;pointer-events:none;
+  transition:opacity .2s,transform .2s var(--ease);z-index:20}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* controles na tela (como no Remote Play) */
+#pad{position:absolute;inset:0;pointer-events:none;transition:opacity .2s;z-index:10}
+#pad.off{opacity:0}
+#pad .b{position:absolute;pointer-events:auto;display:grid;place-items:center;color:rgba(205,220,255,.85);
+  background:rgba(255,255,255,.07);border:2px solid var(--line);font-size:17px;font-weight:600;transition:background .08s,transform .08s}
+#pad .b.down{background:rgba(255,255,255,.3);transform:scale(.94)}
+#pad .pill{width:52px;height:36px;border-radius:18px 18px 8px 18px}
+#l2{left:34px;top:392px;transform:rotate(-38deg)} #l1{left:78px;top:432px;transform:rotate(-38deg)}
+#r2{right:34px;top:388px;transform:rotate(38deg);border-radius:18px 18px 18px 8px} #r1{right:78px;top:432px;transform:rotate(38deg);border-radius:18px 18px 18px 8px}
+#pad .face{width:42px;height:42px;border-radius:50%}
+#bt{right:57px;top:500px} #bs{right:105px;top:548px} #bc{right:9px;top:548px} #bx{right:57px;top:596px}
+#dpad{position:absolute;left:12px;top:504px;width:132px;height:132px;pointer-events:none}
+#dpad .b{width:46px;height:46px;border-radius:12px}
+#dup{left:43px;top:0} #ddn{left:43px;top:86px} #dlf{left:0;top:43px} #drt{left:86px;top:43px}
+#pad svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+
+#hint{position:absolute;left:0;right:0;bottom:16px;text-align:center;font-size:14px;font-weight:300;opacity:.6;z-index:9}
+/* ---------- biblioteca de jogos (launcher) ---------- */
+.tile.game .ico{background-size:cover;background-position:center}
+.tile.game .ico .ini{font-size:46px;font-weight:600;letter-spacing:1px;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+.tile.add .ico svg{width:46%;height:46%}
+.tile .bar .cm{font-size:20px;letter-spacing:.3px;color:#fff;font-weight:400}
+.screen{position:absolute;inset:0;z-index:8;background:linear-gradient(135deg,#0a1b83,#1339b6 55%,#0b2a9f);opacity:0;pointer-events:none;transition:opacity .2s}
+.screen.show{opacity:1;pointer-events:auto}
+.stitle{position:absolute;left:96px;top:40px;font-size:40px;font-weight:300}
+.ssub{position:absolute;left:98px;top:98px;font-size:18px;opacity:.7;font-weight:300}
+#grid{position:absolute;left:170px;top:148px;width:944px;height:492px;overflow-y:auto;overflow-x:hidden;display:grid;grid-template-columns:repeat(5,170px);gap:20px 20px;align-content:start;padding:10px;touch-action:pan-y;scrollbar-width:none}
+#grid::-webkit-scrollbar{display:none}
+.card{width:170px;cursor:pointer}
+.card .cv{width:170px;height:170px;display:grid;place-items:center;border:2px solid rgba(190,210,255,.25);transition:transform .15s,box-shadow .15s}
+.card.focus .cv{box-shadow:0 0 0 3px #fff,0 0 0 7px rgba(255,255,255,.22),0 10px 30px rgba(0,10,80,.5);transform:scale(1.04)}
+.card .nm{margin-top:10px;font-size:17px;text-align:center;font-weight:300;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .cv .ini{font-size:44px;font-weight:600;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+.card .cv svg{width:44%;height:44%}
+#dlg{position:absolute;inset:0;z-index:30;background:rgba(0,6,50,.88);display:flex;justify-content:center;align-items:flex-start;padding-top:20px}
+#dlg.hidden{display:none}
+.dbox{width:960px;background:rgba(10,28,130,.97);border:1px solid rgba(255,255,255,.35);padding:20px 30px 22px;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,40,.6)}
+.dt{font-size:30px;font-weight:300;margin-bottom:6px}
+.dbox label{display:block;font-size:16px;opacity:.85;margin-top:8px}
+.dbox input[type=text]{display:block;width:100%;margin-top:4px;padding:9px 12px;font:inherit;font-size:22px;color:#fff;background:rgba(0,0,40,.55);border:1px solid rgba(190,210,255,.5);border-radius:4px;outline:none;user-select:text;-webkit-user-select:text;touch-action:auto}
+.dbox input[type=text]:focus{border-color:#fff}
+.row2{display:flex;gap:18px;margin-top:12px;align-items:center}
+.cover{width:92px;height:92px;flex:none;background:rgba(255,255,255,.1) center/cover;border:1px solid rgba(190,210,255,.5);display:grid;place-items:center;font-size:14px;opacity:.9}
+.dbox button{font:inherit;font-size:18px;color:#fff;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4);border-radius:4px;padding:9px 18px;margin:0 10px 6px 0;cursor:pointer;touch-action:manipulation}
+.dbox button.primary{background:#1760d6;border-color:#fff}
+.small{font-size:14px;opacity:.65;margin-top:4px;max-width:700px}
+.stt{font-size:15px;opacity:.8;margin:10px 0 6px}
+#sug{display:flex;flex-wrap:wrap;gap:6px;max-height:112px;overflow-y:auto;touch-action:pan-y}
+.chip{font-size:15px;padding:5px 11px;border:1px solid rgba(190,210,255,.45);border-radius:14px;background:rgba(255,255,255,.08);cursor:pointer}
+.chip:active{background:rgba(255,255,255,.3)}
+.dbtn{margin-top:12px}
+#pick{position:absolute;inset:0;z-index:31;background:linear-gradient(135deg,#0a1b83,#1339b6 55%,#0b2a9f);display:none;flex-direction:column;padding:22px 40px 18px}
+#pick.show{display:flex}
+#pick .ph{display:flex;align-items:center;gap:16px}
+#pick .pt{font-size:30px;font-weight:300;flex:1}
+#pick input[type=text]{width:340px;padding:9px 12px;font:inherit;font-size:20px;color:#fff;background:rgba(0,0,40,.55);border:1px solid rgba(190,210,255,.5);border-radius:4px;outline:none;user-select:text;-webkit-user-select:text;touch-action:auto}
+#pick button{font:inherit;font-size:17px;color:#fff;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4);border-radius:4px;padding:8px 16px;cursor:pointer;touch-action:manipulation}
+#pick button.on{background:#1760d6;border-color:#fff}
+#pick .psub{font-size:15px;opacity:.7;margin:6px 0 10px}
+#apps{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(7,1fr);gap:14px 10px;align-content:start;touch-action:pan-y;padding:4px;scrollbar-width:none}
+#apps::-webkit-scrollbar{display:none}
+.app{position:relative;text-align:center;cursor:pointer;padding:8px 4px;border-radius:6px;border:1px solid transparent}
+.app:active{background:rgba(255,255,255,.2)}
+.app.has{border-color:rgba(120,255,160,.7);background:rgba(80,255,140,.1)}
+.app .ai{width:84px;height:84px;margin:0 auto;border-radius:18px;background:rgba(255,255,255,.1) center/cover}
+.app .an{margin-top:6px;font-size:14px;line-height:1.15;max-height:34px;overflow:hidden}
+.app .ck{position:absolute;right:20px;top:6px;font-size:20px;color:#7dffa6;text-shadow:0 1px 4px #000}
+
+@media (prefers-reduced-motion:reduce){.tile,#label,#sub,.tile .bar,.tile .ico svg{transition:none}.tile.press{animation:none}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="bg" width="640" height="360"></canvas>
+
+  <div id="top">
+    <div class="it" style="left:55px" title="PlayStation Plus">
+      <svg width="30" height="30" viewBox="0 0 30 30"><path d="M11 2h8v9h9v8h-9v9h-8v-9H2v-8h9z" fill="#f4c430"/><path d="M19 2c5 0 9 4 9 9h-9z" fill="#ffd95a"/></svg>
+    </div>
+    <div class="it" style="left:122px" title="Informações">
+      <svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#fff"/><rect x="10.6" y="10" width="2.8" height="8" rx="1" fill="#0b2aa0"/><circle cx="12" cy="6.8" r="1.7" fill="#0b2aa0"/></svg>
+    </div>
+    <div class="it" style="left:482px" title="Amigos">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"><rect x="2" y="9" width="13" height="13" rx="3"/><rect x="13" y="3" width="13" height="13" rx="3" fill="#0b2aa0"/><circle cx="19.5" cy="9.5" r="1.4" fill="#fff" stroke="none"/><circle cx="6.5" cy="13.5" r="1.3" fill="#fff" stroke="none"/><circle cx="10.5" cy="17.5" r="1.3" fill="#fff" stroke="none"/></svg>
+    </div>
+    <div class="it" style="left:556px"><span class="dot"></span><span class="avatar" id="av">HB</span><span id="uname">Henry Bayle</span></div>
+    <div class="it" style="left:862px" title="Troféus">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="#fff"><path d="M6 3h14v6a7 7 0 0 1-14 0zM2.5 4.5h3.5v3.5a3.2 3.2 0 0 1-3.5-3.5zm21 0H20v3.5a3.2 3.2 0 0 0 3.5-3.5z"/><rect x="11.5" y="15" width="3" height="5"/><rect x="7.5" y="20" width="11" height="3" rx="1"/></svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="#ffd34d" style="margin-left:2px"><path d="m12 2 3 7 7 .6-5.3 4.8 1.7 7.1L12 17.5 5.6 21.5l1.7-7.1L2 9.600 9 9z"/></svg><span id="troph">2</span>
+    </div>
+    <div class="it" id="clock">19:33</div>
+  </div>
+
+  <div id="row"></div>
+  <div id="label"></div>
+  <div id="sub"></div>
+  <div id="toast"></div>
+  <div class="screen" id="libScr"><div class="stitle">Biblioteca</div><div class="ssub">Jogos instalados neste celular · ✕ abre o jogo</div><div id="grid"></div></div>
+
+  <div id="pad">
+    <div class="b pill" id="l2" data-k="L2">L2</div><div class="b pill" id="l1" data-k="L1">L1</div>
+    <div class="b pill" id="r2" data-k="R2">R2</div><div class="b pill" id="r1" data-k="R1">R1</div>
+    <div id="dpad">
+      <div class="b" id="dup" data-k="UP"><svg viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg></div>
+      <div class="b" id="ddn" data-k="DOWN"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></div>
+      <div class="b" id="dlf" data-k="LEFT"><svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg></div>
+      <div class="b" id="drt" data-k="RIGHT"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></div>
+    </div>
+    <div class="b face" id="bt" data-k="TRIANGLE"><svg viewBox="0 0 24 24"><path d="M12 5 20 19H4z"/></svg></div>
+    <div class="b face" id="bs" data-k="SQUARE"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></div>
+    <div class="b face" id="bc" data-k="CIRCLE"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/></svg></div>
+    <div class="b face" id="bx" data-k="CROSS"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></div>
+  </div>
+  <div id="hint">← → navegar &nbsp;·&nbsp; Enter / ✕ abrir &nbsp;·&nbsp; C esconde os botões na tela</div>
+  <div id="dlg" class="hidden"><div class="dbox">
+    <div class="dt" id="dtitle">Adicionar jogo</div>
+    <label>Nome do jogo<input id="fName" type="text" autocomplete="off" placeholder="Ex.: Minecraft"></label>
+    <label>Pacote do app ou link da Play Store<input id="fPkg" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="com.mojang.minecraftpe"></label>
+    <div class="row2"><div class="cover" id="fPrev">Capa</div><div>
+      <button id="fApk" type="button" class="primary">Escolher o APK do jogo</button><button id="fPick" type="button">Capa (galeria)</button><button id="fClear" type="button">Sem capa</button>
+      <div class="small">Jogo de fora da Play Store? Toque em “Escolher o APK do jogo” e selecione o arquivo .apk (ou .xapk) dele: o nome, o ícone e o pacote são lidos sozinhos. Para ABRIR os jogos, use este arquivo no Chrome do Android (dentro do Acode ou de visualizadores o Android bloqueia).</div></div></div>
+    <div class="stt">Sugestões populares (toque para preencher)</div><div id="sug"></div>
+    <div class="dbtn"><button id="fSave" class="primary" type="button">Salvar</button><button id="fCancel" type="button">Cancelar</button></div>
+    <input type="file" id="fFile" accept="image/*" hidden><input type="file" id="fApkFile" accept="*/*" multiple hidden>
+  </div></div>
+  <div id="pick"><div class="ph"><div class="pt">Apps instalados no celular</div>
+    <input id="pSearch" type="text" placeholder="Buscar…" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button id="pInst" class="on" type="button">Instalados</button><button id="pGames" type="button">Jogos</button><button id="pAll" type="button">Todos</button>
+    <button id="pManual" type="button">Digitar pacote</button><button id="pClose" type="button">Fechar</button></div>
+    <div class="psub">Toque num app para adicionar à Biblioteca (os já adicionados ficam com ✓). Jogos baixados fora da Play Store (APK/MOD) aparecem em “Instalados”.</div>
+    <div id="apps"></div></div>
+</div>
+
+<script>
+(()=>{
+"use strict";
+/* ---------- dados ---------- */
+const USER="Henry Bayle";
+const SW=138, SH=138, BW=232, BH=224, GAP=5, ROW_TOP=134, X0=39, FOCUS_X=182;   // tamanhos em px do palco 1280x720
+const S=(p,o={})=>`<svg viewBox="0 0 100 100" fill="none" stroke="#fff" stroke-width="${o.sw||4.5}" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const ICONS={
+  store:`<svg viewBox="0 0 100 100"><path d="M24 36h52l5 52H19z" fill="#fff"/><path d="M38 36v-8a12 12 0 0 1 24 0v8" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><text x="50" y="76" text-anchor="middle" font-family="Arial Black,Arial" font-weight="900" font-style="italic" font-size="28" fill="#1760d6">PS</text></svg>`,
+  new:S(`<rect x="9" y="9" width="32" height="32"/><path d="M75 8 91 40H59z"/><path d="M11 59 39 87M39 59 11 87"/><circle cx="75" cy="73" r="16"/>`,{sw:4}),
+  live:S(`<rect x="12" y="22" width="76" height="54" rx="6"/><path d="M42 38v22l20-11z" fill="#fff"/>`),
+  tv:S(`<rect x="12" y="20" width="76" height="52" rx="5"/><path d="M34 84h32M50 72v12"/>`),
+  lib:`<svg viewBox="0 0 100 100"><g fill="#fff"><rect x="10" y="12" width="20" height="16" rx="2"/><rect x="34" y="12" width="20" height="16" rx="2"/><rect x="58" y="12" width="20" height="16" rx="2"/><rect x="10" y="33" width="20" height="16" rx="2"/><rect x="34" y="33" width="20" height="16" rx="2"/><rect x="58" y="33" width="20" height="16" rx="2"/><rect x="10" y="54" width="20" height="16" rx="2"/><rect x="34" y="54" width="20" height="16" rx="2"/></g><circle cx="74" cy="68" r="20" fill="#16349e" stroke="#fff" stroke-width="4.5"/><path d="M64 68h16M74 60l8 8-8 8" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  now:`<svg viewBox="0 0 100 100"><circle cx="50" cy="42" r="30" fill="#fff"/><path d="M40 28c10-3 22 1 24 9s-6 11-14 13l-9 3v-9l8-2c4-1 5-3 2-5-3-1-8 0-11 1z" fill="#1760d6"/><path d="M36 52c6-2 14-3 20-1 3 1 3 3 0 5-3 2-10 3-16 4z" fill="#1760d6"/></svg>`,
+  video:`<svg viewBox="0 0 100 100"><rect x="14" y="14" width="72" height="56" fill="#fff"/><g fill="#1760d6"><rect x="19" y="19" width="6" height="6"/><rect x="19" y="31" width="6" height="6"/><rect x="19" y="43" width="6" height="6"/><rect x="19" y="55" width="6" height="6"/><rect x="75" y="19" width="6" height="6"/><rect x="75" y="31" width="6" height="6"/><rect x="75" y="43" width="6" height="6"/><rect x="75" y="55" width="6" height="6"/></g><text x="50" y="52" text-anchor="middle" font-family="Arial Black,Arial" font-weight="900" font-style="italic" font-size="24" fill="#1760d6">PS</text></svg>`,
+  gallery:S(`<rect x="10" y="22" width="62" height="48" rx="3"/><path d="M14 66l18-20 14 14 10-10 16 16" /><circle cx="56" cy="36" r="5" fill="#fff"/><rect x="78" y="14" width="14" height="66" rx="2"/><path d="M82 24h6M82 34h6M82 44h6M82 54h6M82 64h6"/>`),
+  music:S(`<path d="M20 60V50a30 30 0 0 1 60 0v10"/><rect x="14" y="56" width="16" height="26" rx="6" fill="#fff"/><rect x="70" y="56" width="16" height="26" rx="6" fill="#fff"/>`),
+  settings:S(`<rect x="12" y="34" width="76" height="50" rx="5"/><path d="M36 34v-8a6 6 0 0 1 6-6h16a6 6 0 0 1 6 6v8M12 56h76M44 56v8h12v-8"/>`),
+};
+const BASE=[
+  {id:"store",   name:"Store",                 brand:true, label:"Store"},
+  {id:"new",     name:"What's New",            content:true, sub:"Novidades dos seus amigos e jogos"},
+  {id:"live",    name:"Live from PlayStation", content:true},
+  {id:"tv",      name:"TV & Video"},
+  {id:"lib",     name:"Library",               content:true},
+  {id:"now",     name:"PlayStation Now",       brand:true, label:"Now"},
+  {id:"video",   name:"PlayStation Video",     brand:true, label:"Video"},
+  {id:"gallery", name:"Gallery"},
+  {id:"music",   name:"Music"},
+  {id:"settings",name:"Settings"},
+];
+const ARROW=`<svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v11M3.5 8.500 8 13l4.500-4.500"/></svg>`;
+
+/* ---------- estado ---------- */
+let focus=1;                                   // começa em What's New, como na imagem
+const stage=document.getElementById("stage"),rowEl=document.getElementById("row"),
+      labelEl=document.getElementById("label"),subEl=document.getElementById("sub"),
+      toastEl=document.getElementById("toast"),padEl=document.getElementById("pad");
+let TILES=[],tiles=[];   // montados por buildTiles(): tiles fixos + jogos do usuario + "Adicionar jogo"
+
+/* ---------- layout: todos pequenos e alinhados; so o selecionado cresce ---------- */
+function layout(first){
+  const pos=[];let x=X0;
+  TILES.forEach((_,i)=>{const w=i===focus?BW:SW,h=i===focus?BH:SH;pos.push({x,w,h});x+=w+GAP});
+  const shift=Math.min(0,FOCUS_X-pos[focus].x);
+  tiles.forEach((el,i)=>{const p=pos[i];
+    el.style.left=(p.x+shift)+"px";el.style.width=p.w+"px";el.style.height=p.h+"px";
+    el.classList.toggle("focus",i===focus)});
+  const f=pos[focus],lx=f.x+shift+f.w+14;
+  labelEl.style.left=lx+"px";labelEl.style.top=(ROW_TOP+BH+12)+"px";
+  subEl.style.left=lx+"px";subEl.style.top=(ROW_TOP+BH+62)+"px";
+  if(first)tiles.forEach(el=>{el.style.transition="none"});
+  if(first)requestAnimationFrame(()=>requestAnimationFrame(()=>tiles.forEach(el=>el.style.transition="")));
+}
+function setLabel(){
+  const t=TILES[focus];
+  labelEl.classList.add("swap");
+  setTimeout(()=>{labelEl.textContent=t.name;subEl.textContent=t.sub||"";labelEl.classList.remove("swap")},110);
+}
+function setFocus(i,quiet){
+  i=Math.max(0,Math.min(TILES.length-1,i));if(i===focus)return;
+  focus=i;layout();setLabel();if(!quiet)tick();
+}
+
+/* ---------- ações ---------- */
+let toastT=0;
+function toast(msg){toastEl.textContent=msg;toastEl.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove("show"),1700)}
+function select(){
+  const t=TILES[focus],el=tiles[focus];el.classList.remove("press");void el.offsetWidth;el.classList.add("press");
+  blip(660,.09,.07);
+  if(t.game)launch(t.g);else if(t.id==="add")openAdd();else if(t.id==="lib")openLib();
+  else toast("Abrindo "+t.name+"…");
+}
+function back(){blip(300,.08,.06);toast("Você já está na tela inicial")}
+
+/* ---------- som (WebAudio, so depois da primeira interação) ---------- */
+let ac=null;
+function blip(f,d,v){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();
+  o.type="sine";o.frequency.value=f;g.gain.value=v;g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+d);o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(_){}}
+const tick=()=>blip(520,.05,.05);
+
+/* ---------- entrada unificada ---------- */
+function press(k){
+  if(mode==="dlg")return;
+  if(mode==="lib")return libPress(k);
+  switch(k){
+    case "LEFT":setFocus(focus-1);break;
+    case "RIGHT":setFocus(focus+1);break;
+    case "L1":setFocus(0);break;
+    case "R1":setFocus(TILES.length-1);break;
+    case "CROSS":select();break;
+    case "CIRCLE":back();break;
+    case "TRIANGLE":toast("Opções");blip(440,.06,.05);break;
+    case "SQUARE":if(TILES[focus].game)openLib(TILES[focus].id);else{toast("Opções do conteúdo");blip(440,.06,.05)}break;
+    default:break;}
+}
+const KEYS={ArrowLeft:"LEFT",a:"LEFT",A:"LEFT",ArrowRight:"RIGHT",d:"RIGHT",D:"RIGHT",ArrowUp:"UP",ArrowDown:"DOWN",
+  Enter:"CROSS"," ":"CROSS",z:"CROSS",Z:"CROSS",Escape:"CIRCLE",Backspace:"CIRCLE",x:"CIRCLE",X:"CIRCLE",q:"L1",Q:"L1",e:"R1",E:"R1",
+  Home:"L1",End:"R1"};
+addEventListener("keydown",e=>{
+  if(mode==="dlg"){if(e.key==="Escape")window.psBack();return}
+  if(e.key==="c"||e.key==="C"){padEl.classList.toggle("off");return}
+  const k=KEYS[e.key];if(!k)return;e.preventDefault();press(k)});
+
+/* botoes na tela (toque/mouse) com repeticao ao segurar */
+const holdK=new Set(["LEFT","RIGHT"]);
+padEl.querySelectorAll(".b").forEach(el=>{
+  let timer=0,rep=0;const k=el.dataset.k;
+  const stop=()=>{clearTimeout(timer);clearInterval(rep);el.classList.remove("down")};
+  el.addEventListener("pointerdown",e=>{e.preventDefault();el.setPointerCapture(e.pointerId);el.classList.add("down");press(k);
+    if(holdK.has(k))timer=setTimeout(()=>{rep=setInterval(()=>press(k),130)},330)});
+  ["pointerup","pointercancel","lostpointercapture"].forEach(t=>el.addEventListener(t,stop));
+});
+
+/* controle de verdade (Gamepad API): direcional, analogico esquerdo, ✕ ○ △ □ L1 R1 */
+const gpState={};let gpNext={};
+function pollPad(now){
+  const pads=navigator.getGamepads?navigator.getGamepads():[];
+  for(const gp of pads){if(!gp)continue;
+    const b=i=>gp.buttons[i]&&gp.buttons[i].pressed,ax=gp.axes[0]||0;
+    const dirL=b(14)||ax<-.55,dirR=b(15)||ax>.55;
+    const hold=(name,on)=>{if(on){if(!gpNext[name]){press(name);gpNext[name]=now+330}else if(now>=gpNext[name]){press(name);gpNext[name]=now+120}}else gpNext[name]=0};
+    hold("LEFT",dirL);hold("RIGHT",dirR);
+    const edge=(name,idx)=>{const on=b(idx);if(on&&!gpState[name])press(name);gpState[name]=on};
+    edge("CROSS",0);edge("CIRCLE",1);edge("SQUARE",2);edge("TRIANGLE",3);edge("L1",4);edge("R1",5);
+  }
+  requestAnimationFrame(pollPad);
+}
+addEventListener("gamepadconnected",e=>toast("Controle conectado: "+(e.gamepad.id||"").slice(0,32)));
+requestAnimationFrame(pollPad);
+
+/* ---------- relogio ---------- */
+const clockEl=document.getElementById("clock");
+function clock(){const d=new Date();clockEl.textContent=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}
+clock();setInterval(clock,10000);
+document.getElementById("uname").textContent=USER;
+document.getElementById("av").textContent=USER.split(" ").map(s=>s[0]).join("").slice(0,2);
+
+/* ---------- fundo: ondas azuis suaves do PS4 ---------- */
+const cv=document.getElementById("bg"),c=cv.getContext("2d");
+const calm=matchMedia("(prefers-reduced-motion:reduce)").matches;
+function bg(ms){
+  const t=calm?0:ms/1000,W=640,H=360;
+  const g=c.createLinearGradient(0,0,W,H);g.addColorStop(0,"#0a1b83");g.addColorStop(.5,"#1339b6");g.addColorStop(1,"#0b2a9f");
+  c.fillStyle=g;c.fillRect(0,0,W,H);
+  for(let i=0;i<5;i++){
+    c.beginPath();c.moveTo(0,H);
+    for(let x=0;x<=W;x+=16){const y=150+i*36+Math.sin(x*.012+t*.35+i*1.7)*26+Math.sin(x*.027-t*.22+i)*12;c.lineTo(x,y)}
+    c.lineTo(W,H);c.closePath();c.fillStyle="rgba(125,165,255,"+(.03+i*.007)+")";c.fill();
+  }
+  const v=c.createRadialGradient(W/2,H*.45,H*.3,W/2,H/2,W*.75);v.addColorStop(0,"rgba(0,0,40,0)");v.addColorStop(1,"rgba(0,0,40,.35)");
+  c.fillStyle=v;c.fillRect(0,0,W,H);
+  requestAnimationFrame(bg);
+}
+requestAnimationFrame(bg);
+
+/* ---------- palco 1280x720 que escala para qualquer tela ---------- */
+let fitLock=false;   // com o teclado aberto o palco nao encolhe
+addEventListener("focusin",e=>{if(e.target.tagName==="INPUT")fitLock=true});
+addEventListener("focusout",e=>{if(e.target.tagName==="INPUT"){fitLock=false;setTimeout(fit,250)}});
+function fit(){
+  if(fitLock)return;const s=Math.min(innerWidth/1280,innerHeight/720);
+  stage.style.transform=`translate(${(innerWidth-1280*s)/2}px,${(innerHeight-720*s)/2}px) scale(${s})`;
+}
+addEventListener("resize",fit);fit();
+
+/* ======================= BIBLIOTECA = INICIALIZADOR DE JOGOS ANDROID =======================
+   Nao e emulador: cada jogo guarda o "pacote" do app (ex.: com.mojang.minecraftpe) e, ao abrir, o Chrome do
+   Android recebe um link "intent://" que inicia o app ja instalado. Se ele nao estiver instalado, abre a Play Store. */
+const KEY="ps4sim.games";
+const CAT=[["Minecraft","com.mojang.minecraftpe"],["Roblox","com.roblox.client"],["Free Fire","com.dts.freefireth"],["Free Fire MAX","com.dts.freefiremax"],
+ ["Call of Duty Mobile","com.activision.callofduty.shooter"],["PUBG Mobile","com.tencent.ig"],["Genshin Impact","com.miHoYo.GenshinImpact"],["Honkai: Star Rail","com.HoYoverse.hkrpgoversea"],
+ ["Brawl Stars","com.supercell.brawlstars"],["Clash Royale","com.supercell.clashroyale"],["Clash of Clans","com.supercell.clashofclans"],["Among Us","com.innersloth.spacemafia"],
+ ["Subway Surfers","com.kiloo.subwaysurf"],["Stumble Guys","com.kitkagames.fallbuddies"],["Mobile Legends","com.mobile.legends"],["Pokémon GO","com.nianticlabs.pokemongo"],
+ ["Geometry Dash","com.robtopx.geometryjump"],["Hill Climb Racing 2","com.fingersoft.hcr2"],["Candy Crush Saga","com.king.candycrushsaga"],["Asphalt 9","com.gameloft.android.ANMP.GloftA9HM"],
+ ["eFootball","jp.konami.pesam"],["EA FC Mobile","com.ea.gp.fifamobile"],["Dream League Soccer","com.firsttouchgames.dls7"],["Terraria","com.and.games505.TerrariaPaid"],
+ ["Stardew Valley","com.chucklefish.stardewvalley"],["Ludo King","com.ludo.king"],["Plants vs Zombies 2","com.ea.game.pvz2_row"]];
+let GAMES=(()=>{try{const v=JSON.parse(localStorage.getItem(KEY)||"[]");return Array.isArray(v)?v:[]}catch(_){return[]}})();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(GAMES));return true}catch(e){toast("Sem espaço para salvar — use uma capa menor");return false}}
+let mode="home",lsel=0,after="home",editing=null,cover="",rmArm=null;
+const hintEl=document.getElementById("hint"),HINT_HOME=hintEl.innerHTML;
+const libEl=document.getElementById("libScr"),gridEl=document.getElementById("grid"),dlgEl=document.getElementById("dlg");
+const fName=document.getElementById("fName"),fPkg=document.getElementById("fPkg"),fPrev=document.getElementById("fPrev"),fFile=document.getElementById("fFile");
+const PLUS='<svg viewBox="0 0 100 100" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"><circle cx="50" cy="50" r="34"/><path d="M50 32v36M32 50h36"/></svg>';
+const PLAY='<svg viewBox="0 0 16 16" fill="#fff"><path d="M4 2.5v11l9-5.5z"/></svg>';
+const ini=n=>(n.trim().split(/\s+/).map(s=>s[0]||"").join("").slice(0,2)||"?").toUpperCase();
+const hue=n=>{let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))%360;return h};
+function paint(el,g){if(g&&g.cover){el.style.backgroundImage='url("'+g.cover+'")';el.style.backgroundSize="cover";el.style.backgroundPosition="center"}
+  else{const h=hue(g?g.name:"x");el.style.background="linear-gradient(135deg,hsl("+h+",60%,40%),hsl("+((h+45)%360)+",55%,22%))"}}
+function tileList(){const L=[BASE[0],BASE[1]];
+  GAMES.forEach(g=>L.push({id:"g:"+g.id,name:g.name,sub:"Aperte ✕ para abrir o jogo",game:true,g}));
+  L.push({id:"add",name:"Adicionar jogo",sub:"Escolha um app já instalado no celular"});
+  for(let i=2;i<BASE.length;i++)L.push(BASE[i]);return L}
+function buildTiles(keepId){
+  const cur=keepId||(TILES[focus]&&TILES[focus].id);
+  rowEl.innerHTML="";TILES=tileList();
+  tiles=TILES.map((t,i)=>{
+    const b=document.createElement("button");
+    b.className="tile"+(t.brand?" brand":"")+((t.content||t.game)?" has":"")+(t.game?" game":"")+(t.id==="add"?" add":"");
+    b.setAttribute("aria-label",t.name);
+    const inner=t.game?(t.g.cover?"":'<span class="ini">'+ini(t.g.name)+'</span>'):(t.id==="add"?PLUS:ICONS[t.id]);
+    b.innerHTML='<div class="ico">'+inner+(t.label?'<span class="tl">'+t.label+'</span>':"")+'</div><div class="bar">'+(t.game?'<span class="cm">Comece</span>':(t.content?ARROW:""))+'</div>';
+    if(t.game)paint(b.querySelector(".ico"),t.g);
+    b.addEventListener("pointerenter",e=>{if(e.pointerType==="mouse")setFocus(i)});
+    b.addEventListener("click",()=>{setFocus(i);select()});
+    rowEl.appendChild(b);return b});
+  const ni=TILES.findIndex(t=>t.id===cur);focus=ni>=0?ni:Math.max(0,Math.min(focus,TILES.length-1));
+  labelEl.textContent=TILES[focus].name;subEl.textContent=TILES[focus].sub||"";layout(true)}
+
+/* abrir o app instalado */
+function launch(g){
+  if(NATIVE){   // dentro do APK: abre o app instalado direto, sem navegador
+    let ok=false;try{ok=AndroidBridge.launch(g.pkg)}catch(_){}
+    if(ok){toast("Abrindo "+g.name+"…");const i=GAMES.indexOf(g);if(i>0){GAMES.splice(i,1);GAMES.unshift(g);save();setTimeout(()=>buildTiles(),900)}}
+    else toast(g.name+" não está instalado neste celular");return}
+  if(!/Android/i.test(navigator.userAgent)){toast("Para abrir o jogo, use o Chrome no Android");return}
+  toast("Abrindo "+g.name+"…");
+  const fb=encodeURIComponent("https://play.google.com/store/apps/details?id="+g.pkg);
+  const url="intent://#Intent;package="+g.pkg+";action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;S.browser_fallback_url="+fb+";end";
+  const a=document.createElement("a");a.href=url;document.body.appendChild(a);a.click();a.remove();
+  const i=GAMES.indexOf(g);if(i>0){GAMES.splice(i,1);GAMES.unshift(g);save();setTimeout(()=>buildTiles(),900)}   // o ultimo jogado vai para o comeco
+}
+
+/* tela Biblioteca */
+function setMode(m){mode=m;hintEl.innerHTML=m==="lib"?"← → ↑ ↓ navegar &nbsp;·&nbsp; ✕ abrir &nbsp;·&nbsp; △ editar &nbsp;·&nbsp; □ remover &nbsp;·&nbsp; ○ voltar":HINT_HOME}
+function renderLib(){
+  gridEl.innerHTML="";
+  const items=[null].concat(GAMES);if(lsel>=items.length)lsel=items.length-1;
+  items.forEach((g,i)=>{
+    const d=document.createElement("div");d.className="card"+(i===lsel?" focus":"");
+    d.innerHTML='<div class="cv">'+(g?(g.cover?"":'<span class="ini">'+ini(g.name)+'</span>'):PLUS)+'</div><div class="nm">'+(g?g.name.replace(/</g,"&lt;"):"Adicionar jogo")+'</div>';
+    const cv=d.firstChild;if(g)paint(cv,g);else cv.style.background="rgba(255,255,255,.08)";
+    d.addEventListener("click",()=>{lsel=i;libSelect()});gridEl.appendChild(d)});
+  const f=gridEl.children[lsel];if(f&&f.scrollIntoView)f.scrollIntoView({block:"nearest"})}
+function openLib(id){libEl.classList.add("show");setMode("lib");lsel=GAMES.length?1:0;
+  if(id){const k=GAMES.findIndex(g=>"g:"+g.id===id);if(k>=0)lsel=k+1}
+  renderLib()}
+function closeLib(){libEl.classList.remove("show");setMode("home");blip(300,.08,.06)}
+function libSelect(){if(lsel===0)openAdd();else launch(GAMES[lsel-1])}
+function libMove(d){const n=GAMES.length+1;const j=Math.max(0,Math.min(n-1,lsel+d));if(j!==lsel){lsel=j;renderLib();tick()}}
+function libRemove(){if(lsel===0)return;const g=GAMES[lsel-1];
+  if(rmArm===g.id){GAMES.splice(lsel-1,1);save();rmArm=null;renderLib();buildTiles();toast("Jogo removido da biblioteca")}
+  else{rmArm=g.id;toast("Aperte □ de novo para remover "+g.name);setTimeout(()=>{if(rmArm===g.id)rmArm=null},2500)}}
+function libPress(k){
+  switch(k){
+    case "LEFT":libMove(-1);break;case "RIGHT":libMove(1);break;case "UP":libMove(-5);break;case "DOWN":libMove(5);break;
+    case "CROSS":libSelect();break;case "CIRCLE":closeLib();break;
+    case "SQUARE":libRemove();break;case "TRIANGLE":if(lsel>0)openDlg(GAMES[lsel-1]);break;
+    case "L1":libMove(-5);break;case "R1":libMove(5);break;default:break}}
+
+/* janela "Adicionar jogo" */
+const sugEl=document.getElementById("sug");
+CAT.forEach(([n,p])=>{const c=document.createElement("div");c.className="chip";c.textContent=n;
+  c.addEventListener("click",()=>{fName.value=n;fPkg.value=p});sugEl.appendChild(c)});
+function showPrev(){fPrev.style.backgroundImage=cover?'url("'+cover+'")':"none";fPrev.textContent=cover?"":"Capa"}
+function openDlg(g){after=mode==="lib"?"lib":"home";editing=g||null;fName.value=g?g.name:"";fPkg.value=g?g.pkg:"";cover=g&&g.cover?g.cover:"";showPrev();
+  document.getElementById("dtitle").textContent=g?"Editar jogo":"Adicionar jogo";dlgEl.classList.remove("hidden");mode="dlg"}
+function closeDlg(){dlgEl.classList.add("hidden");document.activeElement&&document.activeElement.blur&&document.activeElement.blur();setMode(after)}
+function parsePkg(v){v=(v||"").trim();let m=v.match(/[?&]id=([A-Za-z0-9_.]+)/);if(m)return m[1];m=v.match(/package=([A-Za-z0-9_.]+)/);if(m)return m[1];return v}
+function saveDlg(){
+  const pkg=parsePkg(fPkg.value);
+  if(!/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/.test(pkg)){toast("Pacote inválido. Ex.: com.mojang.minecraftpe");return}
+  const known=CAT.find(c=>c[1]===pkg);
+  const name=fName.value.trim()||(known?known[0]:pkg.split(".").pop());
+  let id;
+  if(editing){Object.assign(editing,{name,pkg,cover});id=editing.id}
+  else{if(GAMES.some(g=>g.pkg===pkg)&&!confirm("Esse jogo já está na biblioteca. Adicionar mesmo assim?"))return;
+    id=Date.now().toString(36);GAMES.push({id,name,pkg,cover})}
+  if(!save())return;
+  const was=after;closeDlg();buildTiles("g:"+id);if(was==="lib")renderLib();toast(editing?"Jogo atualizado":"Jogo adicionado!");editing=null}
+document.getElementById("fSave").addEventListener("click",saveDlg);
+document.getElementById("fCancel").addEventListener("click",closeDlg);
+document.getElementById("fPick").addEventListener("click",()=>fFile.click());
+document.getElementById("fClear").addEventListener("click",()=>{cover="";showPrev()});
+fFile.addEventListener("change",()=>{const f=fFile.files&&fFile.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{const im=new Image();im.onload=()=>{const c=document.createElement("canvas");c.width=c.height=360;const x=c.getContext("2d"),s=Math.max(360/im.width,360/im.height);
+    x.drawImage(im,(360-im.width*s)/2,(360-im.height*s)/2,im.width*s,im.height*s);cover=c.toDataURL("image/jpeg",.82);showPrev()};im.src=r.result};
+  r.readAsDataURL(f);fFile.value=""});
+
+/* ===== ler o pacote/nome/icone direto do arquivo .apk / .xapk (nao precisa saber o nome interno) ===== */
+const rd=async(file,a,b)=>new Uint8Array(await file.slice(a,b).arrayBuffer());
+async function inflateRaw(u8){const s=new Blob([u8]).stream().pipeThrough(new DecompressionStream("deflate-raw"));return new Uint8Array(await new Response(s).arrayBuffer())}
+async function zipList(file){
+  const tl=Math.min(file.size,66000),tail=await rd(file,file.size-tl,file.size),dv=new DataView(tail.buffer);let e=-1;
+  for(let i=tail.length-22;i>=0;i--)if(dv.getUint32(i,true)===0x06054b50){e=i;break}
+  if(e<0)throw new Error("não é um arquivo zip/apk");
+  const cdSize=dv.getUint32(e+12,true),cdOff=dv.getUint32(e+16,true),cd=await rd(file,cdOff,cdOff+cdSize),cv=new DataView(cd.buffer),out=new Map();
+  let p=0;while(p+46<=cd.length&&cv.getUint32(p,true)===0x02014b50){
+    const method=cv.getUint16(p+10,true),csize=cv.getUint32(p+20,true),usize=cv.getUint32(p+24,true),nl=cv.getUint16(p+28,true),el=cv.getUint16(p+30,true),cl=cv.getUint16(p+32,true),lo=cv.getUint32(p+42,true);
+    out.set(new TextDecoder().decode(cd.subarray(p+46,p+46+nl)),{method,csize,usize,lo});p+=46+nl+el+cl}
+  return out}
+async function zipRead(file,en){const h=await rd(file,en.lo,en.lo+30),hv=new DataView(h.buffer),o=en.lo+30+hv.getUint16(26,true)+hv.getUint16(28,true);
+  const data=await rd(file,o,o+en.csize);return en.method===0?data:await inflateRaw(data)}
+function parseAxml(u8){   // AndroidManifest.xml binario -> {pkg,label}
+  const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength),u16=o=>dv.getUint16(o,true),u32=o=>dv.getUint32(o,true);
+  if(u16(0)!==3)throw new Error("manifesto inválido");
+  let p=8;if(u16(p)!==1)throw new Error("manifesto inválido");
+  const ps=p,hdr=u16(p+2),psz=u32(p+4),sc=u32(p+8),flags=u32(p+16),sSt=u32(p+20),utf8=(flags&0x100)!==0,S=[];
+  for(let i=0;i<sc;i++){let o=ps+sSt+u32(ps+hdr+i*4);
+    if(utf8){const l=u8[o];o+=(l&0x80)?2:1;let bl=u8[o];if(bl&0x80){bl=((bl&0x7f)<<8)|u8[o+1];o+=2}else o+=1;S.push(new TextDecoder().decode(u8.subarray(o,o+bl)))}
+    else{let l=u16(o);o+=2;if(l&0x8000){l=((l&0x7fff)<<16)|u16(o);o+=2}let s="";for(let k=0;k<l;k++)s+=String.fromCharCode(u16(o+k*2));S.push(s)}}
+  p+=psz;let pkg="",label="";
+  while(p+8<=u8.length){const type=u16(p),sz=u32(p+4);if(sz<8)break;
+    if(type===0x0102){const tag=S[u32(p+20)],as=u16(p+24),az=u16(p+26),ac=u16(p+28);
+      for(let i=0;i<ac;i++){const b=p+16+as+i*az,nm=S[u32(b+4)],raw=u32(b+8),dt=u8[b+15],da=u32(b+16);
+        const val=raw!==0xFFFFFFFF?S[raw]:(dt===3?S[da]:"");
+        if(tag==="manifest"&&nm==="package")pkg=val;
+        if(tag==="application"&&nm==="label"&&dt!==1)label=val||label}
+      if(tag==="application")break}
+    p+=sz}
+  return{pkg,label}}
+const asDataURL=u8=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(new Blob([u8],{type:"image/png"}))});
+async function readApk(file){
+  const L=await zipList(file);let pkg="",name="",icon=null;
+  if(L.has("AndroidManifest.xml")){const m=parseAxml(await zipRead(file,L.get("AndroidManifest.xml")));pkg=m.pkg;name=m.label;
+    const cands=[...L.entries()].filter(([n])=>/^res\/(mipmap|drawable)[^/]*\/(ic_launcher|app_icon|icon|ic_launcher_round|ic_launcher_foreground)\.png$/i.test(n));
+    cands.sort((a,b)=>(/foreground|round/i.test(a[0])-/foreground|round/i.test(b[0]))||(b[1].usize-a[1].usize));
+    if(cands.length)icon=await asDataURL(await zipRead(file,cands[0][1]))}
+  else{   // .xapk / .apkm (varios arquivos dentro): le o manifest.json / info.json
+    const j=L.has("manifest.json")?"manifest.json":(L.has("info.json")?"info.json":"");
+    if(j){const o=JSON.parse(new TextDecoder().decode(await zipRead(file,L.get(j))));pkg=o.package_name||o.pname||"";name=o.name||o.app_name||""}
+    if(L.has("icon.png"))icon=await asDataURL(await zipRead(file,L.get("icon.png")))}
+  if(!pkg)throw new Error("não achei o pacote nesse arquivo");
+  if(!name)name=file.name.replace(/\.(apk|xapk|apkm)$/i,"").replace(/[_\-]+/g," ").replace(/\bmod\b/ig,"MOD").trim();
+  return{pkg,name,icon}}
+const fApkFile=document.getElementById("fApkFile");
+document.getElementById("fApk").addEventListener("click",()=>fApkFile.click());
+fApkFile.addEventListener("change",async()=>{
+  const files=[...(fApkFile.files||[])];fApkFile.value="";if(!files.length)return;
+  if(!window.DecompressionStream){toast("Seu navegador é antigo: atualize o Chrome");return}
+  if(files.length===1){
+    try{const a=await readApk(files[0]);fPkg.value=a.pkg;if(!fName.value.trim()||!editing)fName.value=a.name;
+      coverFromIcon(a.icon,a.name,cv=>{cover=cv;showPrev();toast("Pacote encontrado: "+a.pkg)})}
+    catch(e){toast("Não consegui ler esse arquivo: "+e.message)}
+    return}
+  let n=0;
+  for(const fl of files){try{const a=await readApk(fl);if(GAMES.some(g=>g.pkg===a.pkg))continue;
+    const cv=await new Promise(r=>coverFromIcon(a.icon,a.name,r));GAMES.push({id:Date.now().toString(36)+n,name:a.name,pkg:a.pkg,cover:cv});n++}catch(e){}}
+  if(n){save();closeDlg();buildTiles();toast(n+" jogos adicionados!")}else toast("Nenhum jogo novo encontrado nesses arquivos")});
+
+/* ===== seletor de apps instalados (so funciona dentro do APK "PS4 Launcher", que fornece AndroidBridge) ===== */
+const NATIVE=!!(window.AndroidBridge&&typeof AndroidBridge.listApps==="function");
+let APPS=null,pf="inst",pickOpen=false,iconQ=0;
+const pickEl=document.getElementById("pick"),appsEl=document.getElementById("apps"),pSearch=document.getElementById("pSearch");
+function openAdd(){if(NATIVE)openPick();else openDlg()}
+function openPick(){
+  after=mode==="lib"?"lib":"home";mode="dlg";pickOpen=true;pickEl.classList.add("show");pSearch.value="";
+  if(!APPS){try{APPS=JSON.parse(AndroidBridge.listApps())}catch(e){APPS=[];toast("Não consegui ler a lista de apps")}}
+  setPF("inst")}
+function setPF(m){pf=m;for(const[k,id]of[["inst","pInst"],["games","pGames"],["all","pAll"]])document.getElementById(id).classList.toggle("on",pf===k);renderApps()}
+function closePick(){pickOpen=false;pickEl.classList.remove("show");document.activeElement&&document.activeElement.blur&&document.activeElement.blur();setMode(after)}
+function renderApps(){
+  const q=pSearch.value.trim().toLowerCase();appsEl.innerHTML="";const myIcon=++iconQ;
+  const list=(APPS||[]).filter(a=>(pf==="all"||(pf==="games"?a.g:!a.s))&&(!q||a.n.toLowerCase().includes(q)||a.p.toLowerCase().includes(q)));
+  if(!list.length){appsEl.innerHTML='<div style="grid-column:1/-1;opacity:.7;padding:30px">Nenhum app encontrado. Toque em “Todos” ou use “Digitar pacote”.</div>';return}
+  const todo=[];
+  list.forEach(a=>{const d=document.createElement("div");d.className="app"+(GAMES.some(g=>g.pkg===a.p)?" has":"");
+    d.innerHTML='<div class="ai"></div><div class="an"></div>'+(d.className.includes("has")?'<div class="ck">✓</div>':"");
+    d.querySelector(".an").textContent=a.n;d.addEventListener("click",()=>addApp(a));appsEl.appendChild(d);todo.push([a,d.querySelector(".ai")])});
+  (function next(){if(myIcon!==iconQ)return;for(let k=0;k<8&&todo.length;k++){const[a,el]=todo.shift();
+    if(!a.i){try{a.i=AndroidBridge.icon(a.p)}catch(_){a.i=""}}
+    if(a.i)el.style.backgroundImage='url("'+a.i+'")'}
+    if(todo.length)setTimeout(next,16)})()}
+function coverFromIcon(url,name,cb){
+  const c=document.createElement("canvas");c.width=c.height=360;const x=c.getContext("2d"),h=hue(name);
+  const gr=x.createLinearGradient(0,0,360,360);gr.addColorStop(0,"hsl("+h+",55%,34%)");gr.addColorStop(1,"hsl("+((h+45)%360)+",50%,16%)");x.fillStyle=gr;x.fillRect(0,0,360,360);
+  if(!url){cb(c.toDataURL("image/jpeg",.85));return}
+  const im=new Image();im.onload=()=>{x.shadowColor="rgba(0,0,0,.5)";x.shadowBlur=24;x.drawImage(im,70,60,220,220);cb(c.toDataURL("image/jpeg",.85))};im.onerror=()=>cb(c.toDataURL("image/jpeg",.85));im.src=url}
+function addApp(a){
+  if(GAMES.some(g=>g.pkg===a.p)){toast(a.n+" já está na Biblioteca");return}
+  coverFromIcon(a.i,a.n,cv=>{const id=Date.now().toString(36);GAMES.push({id,name:a.n,pkg:a.p,cover:cv});if(!save()){GAMES.pop();return}
+    buildTiles("g:"+id);renderApps();toast(a.n+" adicionado!")})}
+pSearch.addEventListener("input",renderApps);
+document.getElementById("pInst").addEventListener("click",()=>setPF("inst"));
+document.getElementById("pGames").addEventListener("click",()=>setPF("games"));
+document.getElementById("pAll").addEventListener("click",()=>setPF("all"));
+document.getElementById("pClose").addEventListener("click",()=>{const was=after;closePick();if(was==="lib")renderLib()});
+document.getElementById("pManual").addEventListener("click",()=>{closePick();openDlg()});
+/* botao voltar do Android (o APK chama isto) */
+window.psBack=()=>{if(pickOpen){const was=after;closePick();if(was==="lib")renderLib();return true}
+  if(mode==="dlg"){closeDlg();return true}if(mode==="lib"){closeLib();return true}return false};
+
+buildTiles();
+window.PS4={focus:i=>setFocus(i,true),get index(){return focus},get tiles(){return TILES}};
+})();
+</script>
+</body>
+</html>
