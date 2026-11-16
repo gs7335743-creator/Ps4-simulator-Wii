@@ -16,7 +16,7 @@ LDFLAGS		=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map
 
 LIBS		:=	-lwiiuse -lbte -logc -lm
 
-LIBDIRS		:=	$(PORTLIBS) $(LIBOGC)
+LIBDIRS		:=	$(PORTLIBS) $(LIBOGC) $(DEVKITPRO)/libogc
 
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 
